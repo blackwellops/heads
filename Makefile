@@ -23,6 +23,8 @@ heads_cc	:= $(INSTALL)/bin/musl-gcc \
 	-fdebug-prefix-map=$(pwd)=heads \
 	-gno-record-gcc-switches \
 
+CROSS		:= $(pwd)/crossgcc/x86_64-linux-musl/bin/x86_64-musl-linux-
+
 #heads_cc	:= $(HOME)/install/x86_64-linux-musl/x86_64-linux-musl/bin/gcc
 
 all: $(BOARD).rom
@@ -71,6 +73,10 @@ define define_module =
     # this case, since we don't have a stable version to compare against.
     $(build)/$($1_dir)/.canary:
 	git clone "$($1_repo)" "$(build)/$($1_dir)"
+	if [ -r patches/$1.patch ]; then \
+		( cd $(build)/$($1_dir) ; patch -p1 ) \
+			< patches/$1.patch; \
+	fi
 	touch "$$@"
   else
     # Fetch and verify the source tar file
@@ -121,6 +127,10 @@ define define_module =
 		$(foreach d,$($1_depends),$d.intermediate) \
 		$(build)/$($1_dir)/.configured
 	$(MAKE) -C "$(build)/$($1_dir)" $($1_target)
+
+  $1.clean:
+	-$(RM) "$(build)/$($1_dir)/.configured"
+	-$(MAKE) -C "$(build)/$($1_dir)" clean
 
 .INTERMEDIATE: $1.intermediate
 endef
@@ -203,14 +213,14 @@ $(build)/$(coreboot_dir)/util/cbmem/cbmem: \
 # that were installed.
 initrd_lib_install: $(initrd_bins) $(initrd_libs)
 	-find initrd/bin -type f -a ! -name '*.sh' -print0 \
-		| xargs -0 strip
+		| xargs -0 $(CROSS)strip
 	LD_LIBRARY_PATH="$(INSTALL)/lib" \
 	./populate-lib \
 		$(initrd_lib_dir) \
 		initrd/bin/* \
 		initrd/sbin/* \
 
-	-strip $(initrd_lib_dir)/* ; true
+	-$(CROSS)strip $(initrd_lib_dir)/* ; true
 
 
 #
